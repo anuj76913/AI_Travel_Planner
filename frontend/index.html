@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Travel Planner — Dubai</title>
+    <meta name="description" content="Multi-agent AI travel planner for Dubai powered by LangGraph, Groq, and Gemini.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg: #0b1120;
+            --bg-secondary: #111827;
+            --surface: rgba(17, 24, 39, 0.85);
+            --border: rgba(55, 65, 81, 0.6);
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.25);
+            --accent: #8b5cf6;
+            --accent-glow: rgba(139, 92, 246, 0.2);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --radius: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Animated background gradient */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle at 20% 50%, rgba(59,130,246,0.08) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(139,92,246,0.06) 0%, transparent 50%),
+                        radial-gradient(circle at 50% 80%, rgba(16,185,129,0.04) 0%, transparent 50%);
+            animation: bgShift 20s ease-in-out infinite alternate;
+            z-index: 0;
+        }
+
+        @keyframes bgShift {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-5%, -3%); }
+        }
+
+        /* Layout */
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            background: rgba(11, 17, 32, 0.8);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+        }
+
+        .logo h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            background: var(--accent-glow);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #c4b5fd;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .status-badge.active { opacity: 1; }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        /* Main Content */
+        .main {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 0;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            background: rgba(11, 17, 32, 0.6);
+            backdrop-filter: blur(10px);
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-area::-webkit-scrollbar { width: 6px; }
+        .chat-area::-webkit-scrollbar-track { background: transparent; }
+        .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        /* Welcome State */
+        .welcome {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            gap: 16px;
+            opacity: 0.6;
+        }
+
+        .welcome-icon {
+            font-size: 3rem;
+            margin-bottom: 8px;
+        }
+
+        .welcome h3 { font-weight: 600; font-size: 1.1rem; }
+        .welcome p { font-size: 0.85rem; color: var(--text-dim); max-width: 260px; line-height: 1.5; }
+
+        /* Messages */
+        .msg {
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 90%;
+            animation: slideIn 0.3s ease-out;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .msg.user {
+            background: linear-gradient(135deg, var(--primary), #2563eb);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            color: white;
+        }
+
+        .msg.agent {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .msg-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .msg-label.orchestrator { color: var(--primary); }
+        .msg-label.destination { color: #f472b6; }
+        .msg-label.logistics { color: var(--warning); }
+        .msg-label.budget { color: var(--success); }
+        .msg-label.synthesizer { color: #60a5fa; }
+        .msg-label.review { color: var(--accent); }
+
+        .msg-text {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Thinking indicator */
+        .thinking {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 12px 16px;
+            align-self: flex-start;
+            color: var(--accent);
+            font-size: 0.85rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .thinking-dots span {
+            display: inline-block;
+            width: 5px; height: 5px;
+            background: var(--accent);
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+        .thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Input */
+        .input-container {
+            padding: 1.25rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .input-form {
+            display: flex;
+            gap: 8px;
+        }
+
+        .input-field {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .input-field:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .input-field::placeholder { color: var(--text-dim); }
+
+        .btn-send {
+            background: linear-gradient(135deg, var(--primary), #2563eb);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-family: inherit;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-send:hover { transform: translateY(-1px); box-shadow: 0 4px 12px var(--primary-glow); }
+        .btn-send:active { transform: translateY(0); }
+        .btn-send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Right panel - Itinerary */
+        .itinerary-panel {
+            overflow-y: auto;
+            padding: 2rem 3rem;
+            background: var(--bg);
+            height: 100%;
+        }
+
+        .itinerary-panel::-webkit-scrollbar { width: 6px; }
+        .itinerary-panel::-webkit-scrollbar-track { background: transparent; }
+        .itinerary-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            opacity: 0.3;
+            gap: 16px;
+        }
+
+        .empty-state-icon { font-size: 4rem; }
+        .empty-state p { font-size: 1.1rem; max-width: 400px; line-height: 1.6; }
+
+        /* Markdown styled output */
+        .md-content { animation: fadeIn 0.5s ease-out; line-height: 1.8; }
+        .md-content h1 { font-size: 1.8rem; margin: 1.5rem 0 1rem; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .md-content h2 { font-size: 1.4rem; margin: 2rem 0 0.8rem; color: #60a5fa; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .md-content h3 { font-size: 1.15rem; margin: 1.5rem 0 0.6rem; color: #a78bfa; }
+        .md-content p { margin-bottom: 1rem; color: var(--text-dim); }
+        .md-content ul, .md-content ol { padding-left: 1.5rem; margin-bottom: 1rem; color: var(--text-dim); }
+        .md-content li { margin-bottom: 6px; }
+        .md-content strong { color: #c4b5fd; }
+        .md-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .md-content th { background: var(--surface); padding: 10px 14px; text-align: left; border: 1px solid var(--border); font-size: 0.85rem; }
+        .md-content td { padding: 10px 14px; border: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Review badge at top of itinerary */
+        .review-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+        .review-badge.approved { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+        .review-badge.revision { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); color: #fcd34d; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">✈️</div>
+                <h1>AI Travel Planner</h1>
+            </div>
+            <div class="status-badge" id="statusBadge">
+                <div class="status-dot"></div>
+                <span id="statusText">THINKING</span>
+            </div>
+        </header>
+
+        <main class="main">
+            <aside class="sidebar">
+                <div class="chat-area" id="chatArea">
+                    <div class="welcome" id="welcome">
+                        <div class="welcome-icon">🌍</div>
+                        <h3>Plan Your Dream Trip</h3>
+                        <p>Enter your travel preferences below and watch our AI agents collaborate in real-time.</p>
+                    </div>
+                </div>
+
+                <div class="input-container">
+                    <form class="input-form" id="planForm">
+                        <input 
+                            type="text" 
+                            class="input-field" 
+                            id="promptInput" 
+                            placeholder="Plan a 5-day luxury trip to Dubai..."
+                            autocomplete="off"
+                        >
+                        <button type="submit" class="btn-send" id="sendBtn">Plan</button>
+                    </form>
+                </div>
+            </aside>
+
+            <section class="itinerary-panel" id="itineraryPanel">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-state-icon">📋</div>
+                    <p>Your personalized itinerary will appear here once the agents complete their research.</p>
+                </div>
+                <div class="md-content" id="itineraryContent" style="display:none;"></div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const chatArea = document.getElementById('chatArea');
+        const welcome = document.getElementById('welcome');
+        const planForm = document.getElementById('planForm');
+        const promptInput = document.getElementById('promptInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        const emptyState = document.getElementById('emptyState');
+        const itineraryContent = document.getElementById('itineraryContent');
+
+        const AGENT_LABELS = {
+            orchestrator: '🎯 Orchestrator',
+            destination: '📍 Destination Agent',
+            logistics: '🚇 Logistics Agent',
+            budget: '💰 Budget Agent',
+            synthesizer: '📝 Synthesizer',
+            review: '🔍 Review Agent'
+        };
+
+        function addMessage(sender, content, node) {
+            welcome.style.display = 'none';
+            const div = document.createElement('div');
+            div.className = `msg ${sender}`;
+
+            if (sender === 'agent' && node) {
+                const label = document.createElement('div');
+                label.className = `msg-label ${node}`;
+                label.textContent = AGENT_LABELS[node] || node.toUpperCase();
+                div.appendChild(label);
+            }
+
+            const text = document.createElement('div');
+            text.className = 'msg-text';
+            // Truncate very long agent messages for the sidebar
+            if (sender === 'agent' && typeof content === 'string' && content.length > 300) {
+                text.textContent = content.substring(0, 300) + '...';
+            } else {
+                text.textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+            }
+            div.appendChild(text);
+
+            chatArea.appendChild(div);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function showThinking(node) {
+            // Remove previous thinking indicator
+            const prev = document.getElementById('thinkingIndicator');
+            if (prev) prev.remove();
+
+            const div = document.createElement('div');
+            div.className = 'thinking';
+            div.id = 'thinkingIndicator';
+            div.innerHTML = `${AGENT_LABELS[node] || node} is thinking <div class="thinking-dots"><span></span><span></span><span></span></div>`;
+            chatArea.appendChild(div);
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            statusBadge.classList.add('active');
+            statusText.textContent = (AGENT_LABELS[node] || node).toUpperCase();
+        }
+
+        function hideThinking() {
+            const el = document.getElementById('thinkingIndicator');
+            if (el) el.remove();
+            statusBadge.classList.remove('active');
+        }
+
+        function showItinerary(markdown, reviewData) {
+            emptyState.style.display = 'none';
+            itineraryContent.style.display = 'block';
+
+            let html = '';
+            if (reviewData) {
+                const badgeClass = reviewData.is_approved ? 'approved' : 'revision';
+                const badgeIcon = reviewData.is_approved ? '✅' : '🔄';
+                const badgeText = reviewData.is_approved 
+                    ? `Approved (${reviewData.revisions} revision${reviewData.revisions !== 1 ? 's' : ''})` 
+                    : `Revision ${reviewData.revisions} — ${reviewData.feedback}`;
+                html += `<div class="review-badge ${badgeClass}">${badgeIcon} ${badgeText}</div>`;
+            }
+
+            html += marked.parse(markdown);
+            itineraryContent.innerHTML = html;
+        }
+
+        planForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const prompt = promptInput.value.trim();
+            if (!prompt) return;
+
+            addMessage('user', prompt);
+            promptInput.value = '';
+            sendBtn.disabled = true;
+            promptInput.disabled = true;
+
+            showThinking('orchestrator');
+
+            let latestItinerary = null;
+            let latestReview = null;
+
+            try {
+                const response = await fetch('http://localhost:8000/plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+
+                if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    // NDJSON: each JSON object is on its own line
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || ''; // Keep incomplete last line
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed) continue;
+
+                        try {
+                            const payload = JSON.parse(trimmed);
+                            hideThinking();
+
+                            const node = payload.node;
+
+                            if (node === 'synthesizer' && payload.data) {
+                                latestItinerary = payload.data;
+                                addMessage('agent', '✅ Itinerary drafted! Sending to Review Agent...', node);
+                                showThinking('review');
+                            } else if (node === 'review' && payload.data) {
+                                latestReview = payload.data;
+                                const reviewMsg = payload.data.is_approved 
+                                    ? `✅ APPROVED! ${payload.data.feedback}` 
+                                    : `🔄 REVISION NEEDED: ${payload.data.feedback}`;
+                                addMessage('agent', reviewMsg, node);
+
+                                if (payload.data.is_approved && latestItinerary) {
+                                    showItinerary(latestItinerary, latestReview);
+                                } else if (!payload.data.is_approved) {
+                                    showThinking('destination');
+                                }
+                            } else if (node === 'orchestrator' && payload.data) {
+                                const d = payload.data;
+                                addMessage('agent', `Parsed: ${d.destination || 'Dubai'}, ${d.duration || '?'} days, $${d.budget || '?'}`, node);
+                                showThinking('destination');
+                            } else if (payload.data) {
+                                const content = typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data);
+                                addMessage('agent', content, node);
+
+                                // Show thinking for next agent
+                                const order = ['orchestrator', 'destination', 'logistics', 'budget', 'synthesizer', 'review'];
+                                const idx = order.indexOf(node);
+                                if (idx >= 0 && idx < order.length - 1) {
+                                    showThinking(order[idx + 1]);
+                                }
+                            }
+                        } catch (err) {
+                            console.error('Parse error:', err, 'Line:', trimmed);
+                        }
+                    }
+                }
+
+                // If we have an itinerary but review never showed, display it anyway
+                if (latestItinerary && !latestReview) {
+                    showItinerary(latestItinerary, null);
+                }
+
+            } catch (error) {
+                hideThinking();
+                addMessage('agent', `❌ Error: ${error.message}. Make sure the backend is running on port 8000.`, 'error');
+            } finally {
+                hideThinking();
+                sendBtn.disabled = false;
+                promptInput.disabled = false;
+                promptInput.focus();
+            }
+        });
+    </script>
+</body>
+</html>
