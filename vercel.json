@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/plan",
-      "destination": "https://YOUR_BACKEND_URL_HERE.onrender.com/plan"
+      "destination": "https://aitravelplanner-production-56bb.up.railway.app/plan"
     },
     {
       "source": "/",

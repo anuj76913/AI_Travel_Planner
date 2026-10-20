@@ -69,6 +69,11 @@ async def plan_trip(req: PlanRequest):
 
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for deployment monitoring."""
+    return {"status": "ok"}
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend():
     """Serve the frontend HTML file."""
@@ -77,4 +82,5 @@ async def serve_frontend():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("src.api.server:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("src.api.server:app", host="0.0.0.0", port=port, reload=False)
