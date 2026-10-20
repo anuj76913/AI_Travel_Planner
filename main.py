@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 from src.graph import app
 
 def run_travel_planner(user_request: str):
