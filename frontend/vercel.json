@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/plan",
+      "destination": "https://aitravelplanner-production-56bb.up.railway.app/plan"
+    }
+  ]
+}

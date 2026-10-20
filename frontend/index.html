@@ -504,13 +504,16 @@
         // - Locally on FastAPI (port 8000), uses relative '/plan'
         // - Locally on another port (e.g. Live Server), falls back to 'http://localhost:8000/plan'
         function getApiEndpoint() {
-            if (window.BACKEND_API_URL) {
-                return window.BACKEND_API_URL.replace(/\/$/, '') + '/plan';
-            }
+            // 1. When running locally
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 return window.location.port === '8000' ? '/plan' : 'http://localhost:8000/plan';
             }
-            return '/plan';
+            // 2. Custom override if provided
+            if (window.BACKEND_API_URL) {
+                return window.BACKEND_API_URL.replace(/\/$/, '') + '/plan';
+            }
+            // 3. In production on Vercel: route directly to Railway backend
+            return 'https://aitravelplanner-production-56bb.up.railway.app/plan';
         }
 
         planForm.addEventListener('submit', async (e) => {
