@@ -499,6 +499,20 @@
             itineraryContent.innerHTML = html;
         }
 
+        // Dynamic API endpoint resolution:
+        // - In production (Vercel), uses relative '/plan' (via vercel.json rewrite) or window.BACKEND_API_URL
+        // - Locally on FastAPI (port 8000), uses relative '/plan'
+        // - Locally on another port (e.g. Live Server), falls back to 'http://localhost:8000/plan'
+        function getApiEndpoint() {
+            if (window.BACKEND_API_URL) {
+                return window.BACKEND_API_URL.replace(/\/$/, '') + '/plan';
+            }
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                return window.location.port === '8000' ? '/plan' : 'http://localhost:8000/plan';
+            }
+            return '/plan';
+        }
+
         planForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const prompt = promptInput.value.trim();
@@ -515,7 +529,7 @@
             let latestReview = null;
 
             try {
-                const response = await fetch('http://localhost:8000/plan', {
+                const response = await fetch(getApiEndpoint(), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt })

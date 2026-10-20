@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/plan",
+      "destination": "https://YOUR_BACKEND_URL_HERE.onrender.com/plan"
+    },
+    {
+      "source": "/",
+      "destination": "/frontend/index.html"
+    }
+  ]
+}
