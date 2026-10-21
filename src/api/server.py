@@ -76,7 +76,6 @@ async def plan_trip(req: PlanRequest):
         media_type="application/x-ndjson",
         headers={
             "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
             "X-Accel-Buffering": "no"
         }
     )
