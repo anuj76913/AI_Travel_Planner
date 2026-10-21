@@ -35,33 +35,41 @@ async def plan_trip(req: PlanRequest):
     initial_state = {"user_request": req.prompt}
 
     def event_generator():
-        for chunk in graph_app.stream(initial_state):
-            for node, state_update in chunk.items():
-                payload = {
-                    "node": node,
-                    "status": "completed",
-                }
-                if node == "orchestrator":
-                    payload["data"] = {
-                        "destination": state_update.get("destination"),
-                        "budget": state_update.get("budget"),
-                        "duration": state_update.get("duration")
+        try:
+            for chunk in graph_app.stream(initial_state):
+                for node, state_update in chunk.items():
+                    payload = {
+                        "node": node,
+                        "status": "completed",
                     }
-                elif node == "destination":
-                    payload["data"] = state_update.get("destination_recommendations")
-                elif node == "logistics":
-                    payload["data"] = state_update.get("logistics_recommendations")
-                elif node == "budget":
-                    payload["data"] = state_update.get("budget_recommendations")
-                elif node == "synthesizer":
-                    payload["data"] = state_update.get("final_itinerary")
-                elif node == "review":
-                    payload["data"] = {
-                        "is_approved": state_update.get("is_approved"),
-                        "feedback": state_update.get("review_feedback"),
-                        "revisions": state_update.get("revision_count")
-                    }
-                yield json.dumps(payload) + "\n"
+                    if node == "orchestrator":
+                        payload["data"] = {
+                            "destination": state_update.get("destination"),
+                            "budget": state_update.get("budget"),
+                            "duration": state_update.get("duration")
+                        }
+                    elif node == "destination":
+                        payload["data"] = state_update.get("destination_recommendations")
+                    elif node == "logistics":
+                        payload["data"] = state_update.get("logistics_recommendations")
+                    elif node == "budget":
+                        payload["data"] = state_update.get("budget_recommendations")
+                    elif node == "synthesizer":
+                        payload["data"] = state_update.get("final_itinerary")
+                    elif node == "review":
+                        payload["data"] = {
+                            "is_approved": state_update.get("is_approved"),
+                            "feedback": state_update.get("review_feedback"),
+                            "revisions": state_update.get("revision_count")
+                        }
+                    yield json.dumps(payload) + "\n"
+        except Exception as e:
+            error_payload = {
+                "node": "error",
+                "status": "failed",
+                "data": str(e)
+            }
+            yield json.dumps(error_payload) + "\n"
 
     return StreamingResponse(
         event_generator(),
