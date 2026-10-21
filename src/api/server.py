@@ -81,6 +81,16 @@ async def plan_trip(req: PlanRequest):
         }
     )
 
+@app.get("/test-keys")
+async def test_keys():
+    """Diagnostic endpoint to verify required API keys are configured."""
+    return {
+        "GROQ_API_KEY_SET": bool(os.getenv("GROQ_API_KEY")),
+        "GEMINI_API_KEY_SET": bool(os.getenv("GEMINI_API_KEY")),
+        "TAVILY_API_KEY_SET": bool(os.getenv("TAVILY_API_KEY")),
+        "GEMINI_MODEL_NAME": os.getenv("GEMINI_MODEL_NAME", "default: gemini-3.5-flash-lite")
+    }
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for deployment monitoring."""
