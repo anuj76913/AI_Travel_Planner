@@ -513,7 +513,7 @@
                 return window.BACKEND_API_URL.replace(/\/$/, '') + '/plan';
             }
             // 3. In production on Vercel: route directly to Railway backend
-            return 'https://aitravelplanner-production-56bb.up.railway.app/plan';
+            return 'https://aitravelplanner-production-2c74.up.railway.app/plan';
         }
 
         planForm.addEventListener('submit', async (e) => {
@@ -562,6 +562,7 @@
                             hideThinking();
 
                             const node = payload.node;
+                            if (node === 'heartbeat') continue;
 
                             if (node === 'synthesizer' && payload.data) {
                                 latestItinerary = payload.data;
@@ -607,7 +608,7 @@
 
             } catch (error) {
                 hideThinking();
-                addMessage('agent', `❌ Error: ${error.message}. Make sure the backend is running on port 8000.`, 'error');
+                addMessage('agent', `❌ ${error.message}. Please check connection and try again.`, 'error');
             } finally {
                 hideThinking();
                 sendBtn.disabled = false;

@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/plan",
-      "destination": "https://aitravelplanner-production-56bb.up.railway.app/plan"
+      "destination": "https://aitravelplanner-production-2c74.up.railway.app/plan"
     },
     {
       "source": "/",

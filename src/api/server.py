@@ -29,45 +29,71 @@ class PlanRequest(BaseModel):
 @app.post("/plan")
 async def plan_trip(req: PlanRequest):
     """
-    Streaming endpoint that executes the LangGraph workflow
-    and streams agent events as newline-delimited JSON.
+    Streaming endpoint that executes the LangGraph workflow in a background thread
+    and streams agent events as newline-delimited JSON with keepalive heartbeats.
     """
+    import threading
     initial_state = {"user_request": req.prompt}
 
-    def event_generator():
-        for chunk in graph_app.stream(initial_state):
-            for node, state_update in chunk.items():
-                
-                payload = {
-                    "node": node,
-                    "status": "completed",
-                }
-                
-                if node == "orchestrator":
-                    payload["data"] = {
-                        "destination": state_update.get("destination"),
-                        "budget": state_update.get("budget"),
-                        "duration": state_update.get("duration")
-                    }
-                elif node == "destination":
-                    payload["data"] = state_update.get("destination_recommendations")
-                elif node == "logistics":
-                    payload["data"] = state_update.get("logistics_recommendations")
-                elif node == "budget":
-                    payload["data"] = state_update.get("budget_recommendations")
-                elif node == "synthesizer":
-                    payload["data"] = state_update.get("final_itinerary")
-                elif node == "review":
-                    payload["data"] = {
-                        "is_approved": state_update.get("is_approved"),
-                        "feedback": state_update.get("review_feedback"),
-                        "revisions": state_update.get("revision_count")
-                    }
-                
-                # Yield as a single JSON line followed by newline
-                yield json.dumps(payload) + "\n"
+    async def event_generator():
+        q = asyncio.Queue()
+        loop = asyncio.get_running_loop()
 
-    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+        def run_graph():
+            try:
+                for chunk in graph_app.stream(initial_state):
+                    for node, state_update in chunk.items():
+                        payload = {
+                            "node": node,
+                            "status": "completed",
+                        }
+                        if node == "orchestrator":
+                            payload["data"] = {
+                                "destination": state_update.get("destination"),
+                                "budget": state_update.get("budget"),
+                                "duration": state_update.get("duration")
+                            }
+                        elif node == "destination":
+                            payload["data"] = state_update.get("destination_recommendations")
+                        elif node == "logistics":
+                            payload["data"] = state_update.get("logistics_recommendations")
+                        elif node == "budget":
+                            payload["data"] = state_update.get("budget_recommendations")
+                        elif node == "synthesizer":
+                            payload["data"] = state_update.get("final_itinerary")
+                        elif node == "review":
+                            payload["data"] = {
+                                "is_approved": state_update.get("is_approved"),
+                                "feedback": state_update.get("review_feedback"),
+                                "revisions": state_update.get("revision_count")
+                            }
+                        loop.call_soon_threadsafe(q.put_nowait, payload)
+            except Exception as e:
+                loop.call_soon_threadsafe(q.put_nowait, {"node": "error", "data": str(e)})
+            finally:
+                loop.call_soon_threadsafe(q.put_nowait, None)
+
+        threading.Thread(target=run_graph, daemon=True).start()
+
+        while True:
+            try:
+                item = await asyncio.wait_for(q.get(), timeout=4.0)
+                if item is None:
+                    break
+                yield json.dumps(item) + "\n"
+            except asyncio.TimeoutError:
+                # Keep-alive heartbeat every 4 seconds to prevent browser/proxy idle disconnect
+                yield json.dumps({"node": "heartbeat"}) + "\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @app.get("/health")
 async def health_check():
